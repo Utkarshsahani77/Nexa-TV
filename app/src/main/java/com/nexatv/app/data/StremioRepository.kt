@@ -1,106 +1,77 @@
 package com.nexatv.app.data
 
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
-
-sealed class StremioResult<out T> {
-    data class Success<T>(val data: T) : StremioResult<T>()
-    data class Error(val message: String) : StremioResult<Nothing>()
-}
+import com.nexatv.app.data.local.AddonDao
+import com.nexatv.app.data.local.LocalDatabase
+import com.nexatv.app.data.model.Addon
+import com.nexatv.app.data.model.CatalogItem
+import com.nexatv.app.data.model.StreamItem
+import com.nexatv.app.data.remote.StremioApi
 
 class StremioRepository(
     private val apiKeys: ApiKeys,
     private val database: LocalDatabase
 ) {
 
-    suspend fun getManifest(
-        addonUrl: String
-    ): StremioResult<StremioAddon> = withContext(Dispatchers.IO) {
-        try {
-            val service = NetworkModule.createStremioService(addonUrl)
-            val response = service.getManifest()
+    private val addonDao: AddonDao = database.addonDao()
 
-            StremioResult.Success(response)
-        } catch (e: Exception) {
-            StremioResult.Error(e.message ?: "Failed to load addon")
-        }
-    }
+    suspend fun addAddon(url: String): Addon? {
+        return try {
+            val addon = StremioApi.parseAddon(url)
 
-    suspend fun getCatalog(
-        addonUrl: String,
-        catalogId: String,
-        catalogType: String
-    ): StremioResult<List<StremioMeta>> = withContext(Dispatchers.IO) {
-        try {
-            val service = NetworkModule.createStremioService(addonUrl)
-            val response = service.getCatalog(
-                type = catalogType,
-                catalogId = catalogId
+            addonDao.insert(
+                Addon(
+                    id = addon.id,
+                    name = addon.name,
+                    url = addon.url,
+                    type = addon.type
+                )
             )
 
-            StremioResult.Success(response.metas)
+            addon
         } catch (e: Exception) {
-            StremioResult.Error(e.message ?: "Failed to load catalog")
+            null
         }
     }
 
-    suspend fun getMeta(
-        addonUrl: String,
-        type: String,
-        metaId: String
-    ): StremioResult<StremioMeta> = withContext(Dispatchers.IO) {
-        try {
-            val service = NetworkModule.createStremioService(addonUrl)
-            val response = service.getMeta(
-                type = type,
-                metaId = metaId
-            )
+    suspend fun getAddons(): List<Addon> {
+        return addonDao.getAll()
+    }
 
-            StremioResult.Success(response.meta)
+    suspend fun removeAddon(id: String) {
+        addonDao.delete(id)
+    }
+
+    suspend fun getCatalog(addonId: String): List<CatalogItem> {
+        return try {
+            val addon = addonDao.getById(addonId) ?: return emptyList()
+
+            StremioApi.getCatalog(addon.url)
         } catch (e: Exception) {
-            StremioResult.Error(e.message ?: "Failed to load meta")
+            emptyList()
         }
     }
 
-    suspend fun getStreams(
-        addonUrl: String,
-        type: String,
-        metaId: String
-    ): StremioResult<List<StremioStream>> = withContext(Dispatchers.IO) {
-        try {
-            val service = NetworkModule.createStremioService(addonUrl)
-            val response = service.getStreams(
-                type = type,
-                metaId = metaId
-            )
+    suspend fun getMeta(metaId: String): CatalogItem? {
+        return try {
+            val addons = addonDao.getAll()
 
-            StremioResult.Success(response.streams)
+            addons.firstNotNullOfOrNull { addon ->
+                StremioApi.getMeta(addon.url, metaId)
+            }
         } catch (e: Exception) {
-            StremioResult.Error(e.message ?: "Failed to load streams")
+            null
         }
     }
 
-    suspend fun getFavourites(): List<FavouriteEntity> = withContext(Dispatchers.IO) {
-        database.favouriteDao().getAll().let { flow ->
-            kotlinx.coroutines.flow.first(flow)
+    suspend fun getStreams(metaId: String): List<StreamItem> {
+        return try {
+            val addons = addonDao.getAll()
+
+            addons.flatMap { addon ->
+                StremioApi.getStreams(addon.url, metaId)
+            }
+        } catch (e: Exception) {
+            emptyList()
         }
-    }
-
-    suspend fun addFavourite(item: FavouriteEntity) = withContext(Dispatchers.IO) {
-        database.favouriteDao().insert(item)
-    }
-
-    suspend fun removeFavourite(id: String) = withContext(Dispatchers.IO) {
-        database.favouriteDao().delete(id)
-    }
-
-    suspend fun getWatchHistory(): List<WatchHistoryEntity> = withContext(Dispatchers.IO) {
-        database.watchHistoryDao().getAll().let { flow ->
-            kotlinx.coroutines.flow.first(flow)
-        }
-    }
-
-    suspend fun addWatchHistory(item: WatchHistoryEntity) = withContext(Dispatchers.IO) {
-        database.watchHistoryDao().insert(item)
     }
 }

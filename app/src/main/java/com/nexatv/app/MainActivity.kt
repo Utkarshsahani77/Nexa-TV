@@ -4,10 +4,22 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Scaffold
+import androidx.compose.material3.NavigationBar
+import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.Icon
+import androidx.compose.material3.Text
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.LiveTv
+import androidx.compose.material.icons.filled.Movie
+import androidx.compose.material.icons.filled.Tv
+import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -58,6 +70,45 @@ class MainActivity : ComponentActivity() {
     }
 }
 
+data class BottomItem(
+    val route: String,
+    val label: String,
+    val icon: ImageVector
+)
+
+@Composable
+fun NexaBottomBar(
+    currentRoute: String?,
+    onNavigate: (String) -> Unit
+) {
+    val items = listOf(
+        BottomItem("home", "Home", Icons.Filled.Home),
+        BottomItem("livetv", "Live TV", Icons.Filled.LiveTv),
+        BottomItem("movies", "Movies", Icons.Filled.Movie),
+        BottomItem("series", "Series", Icons.Filled.Tv),
+        BottomItem("search", "Search", Icons.Filled.Search),
+        BottomItem("library", "Library", Icons.Filled.Favorite),
+        BottomItem("settings", "Settings", Icons.Filled.Settings)
+    )
+
+    NavigationBar {
+        items.forEach { item ->
+            NavigationBarItem(
+                selected = currentRoute == item.route,
+                onClick = {
+                    onNavigate(item.route)
+                },
+                icon = {
+                    Icon(item.icon, contentDescription = item.label)
+                },
+                label = {
+                    Text(item.label)
+                }
+            )
+        }
+    }
+}
+
 @Composable
 fun MainNavHost(app: NexaApp) {
     val navController = rememberNavController()
@@ -74,7 +125,7 @@ fun MainNavHost(app: NexaApp) {
         "settings"
     )
 
-    Scaffold(
+    androidx.compose.material3.Scaffold(
         bottomBar = {
             if (showBottomBar) {
                 NexaBottomBar(
@@ -123,7 +174,7 @@ fun MainNavHost(app: NexaApp) {
                 LiveTvScreen(
                     viewModel = viewModel,
                     onPlayChannel = { channel ->
-                        navController.navigate("player/${channel.url}")
+                        navController.navigate("player/" + channel.url)
                     }
                 )
             }
@@ -197,10 +248,10 @@ fun MainNavHost(app: NexaApp) {
                 DetailsScreen(
                     itemId = itemId,
                     onPlay = { url ->
-                        navController.navigate("player/$url")
+                        navController.navigate("player/" + url)
                     },
                     onDownload = { url, title ->
-                        navController.navigate("player/$url")
+                        navController.navigate("player/" + url)
                     }
                 )
             }
@@ -232,7 +283,7 @@ fun MainNavHost(app: NexaApp) {
                 AddonsScreen(
                     viewModel = viewModel,
                     onOpenCatalog = { addonId ->
-                        navController.navigate("catalog/$addonId")
+                        navController.navigate("catalog/" + addonId)
                     }
                 )
             }
@@ -256,7 +307,7 @@ fun MainNavHost(app: NexaApp) {
                     viewModel = viewModel,
                     addonId = addonId,
                     onOpenMeta = { metaId ->
-                        navController.navigate("meta/$metaId")
+                        navController.navigate("meta/" + metaId)
                     }
                 )
             }
@@ -280,7 +331,7 @@ fun MainNavHost(app: NexaApp) {
                     viewModel = viewModel,
                     metaId = metaId,
                     onPlay = { url ->
-                        navController.navigate("player/$url")
+                        navController.navigate("player/" + url)
                     }
                 )
             }
@@ -293,7 +344,7 @@ fun MainNavHost(app: NexaApp) {
                 StalkerScreen(
                     viewModel = viewModel,
                     onPlayChannel = { channel ->
-                        navController.navigate("player/${channel.url}")
+                        navController.navigate("player/" + channel.url)
                     }
                 )
             }
